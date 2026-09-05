@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>오늘의 할일 — daily-task-tracker</title>
+<style>
+  :root {
+    --bg: #f7f7f8;
+    --card: #ffffff;
+    --border: #e6e6ea;
+    --text: #1c1c1f;
+    --muted: #75757f;
+    --p1: #d73a4a;
+    --p2: #b8860b;
+    --p3: #0e8a16;
+    --overdue-bg: #fdecec;
+    --today-bg: #fff8e6;
+    --accent: #2f6fed;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif;
+    padding: 24px 16px 64px;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  header { margin-bottom: 20px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .date { color: var(--muted); font-size: 14px; }
+
+  .stats {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin: 16px 0 20px;
+    font-size: 14px;
+  }
+  .stats .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .stats .row:last-child { margin-bottom: 0; }
+  .streak { font-weight: 700; font-size: 16px; }
+  .strip { letter-spacing: 2px; }
+
+  .toolbar { display: flex; gap: 8px; margin-bottom: 14px; }
+  button {
+    font: inherit;
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    color: var(--text);
+  }
+  button:hover { background: #f0f0f2; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover { opacity: 0.9; }
+
+  .card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  .card.overdue { background: var(--overdue-bg); }
+  .card.due-today { background: var(--today-bg); }
+  .card.closing { opacity: 0; transform: translateX(8px); }
+
+  .checkbox {
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    border: 2px solid #c7c7cf;
+    flex: none;
+    margin-top: 2px;
+    cursor: pointer;
+    background: #fff;
+  }
+  .checkbox:hover { border-color: var(--accent); }
+
+  .card-body { flex: 1; min-width: 0; }
+  .card-title { font-size: 15px; font-weight: 600; word-break: break-word; }
+  .card-title a { color: inherit; text-decoration: none; }
+  .card-title a:hover { text-decoration: underline; }
+  .tags { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    color: #fff;
+    font-weight: 600;
+  }
+  .tag.p1 { background: var(--p1); }
+  .tag.p2 { background: var(--p2); }
+  .tag.p3 { background: var(--p3); }
+  .tag.category { background: #6b6b76; }
+  .tag.overdue { background: #b91c1c; }
+  .tag.today { background: #b8860b; }
+
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px 0;
+    font-size: 14px;
+  }
+
+  .gate {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .gate input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font: inherit;
+    margin: 10px 0;
+  }
+  .gate a { color: var(--accent); }
+  .error {
+    color: #b91c1c;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  footer { margin-top: 28px; text-align: center; color: var(--muted); font-size: 12px; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>✅ 오늘의 할일</h1>
+      <div class="date" id="todayLabel"></div>
+    </header>
+
+    <div id="statsBox" class="stats" hidden></div>
+
+    <div class="toolbar" id="toolbar" hidden>
+      <button id="refreshBtn">🔄 새로고침</button>
+      <button id="logoutBtn">토큰 지우기</button>
+    </div>
+
+    <div id="gate" class="gate" hidden>
+      <strong>GitHub 토큰이 필요해요</strong><br />
+      이 페이지에서 할일을 체크(완료)하려면 <code>repo</code> 권한이 있는 Personal Access Token이 필요합니다.
+      <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">여기서 만들기</a>
+      (이미 만든 토큰이 있다면 그걸 그대로 써도 돼요)<br />
+      <input id="tokenInput" type="password" placeholder="ghp_..." autocomplete="off" />
+      <button class="primary" id="saveTokenBtn">저장하고 불러오기</button>
+      <div class="error" id="gateError" hidden></div>
+      <div style="margin-top:10px; color:var(--muted); font-size:12px;">
+        토큰은 이 브라우저에만 저장되고(localStorage), 다른 곳으로 전송되지 않아요. GitHub API로 직접 요청을 보낼 때만 사용됩니다.
+      </div>
+    </div>
+
+    <div id="list"></div>
+    <div id="emptyMsg" class="empty" hidden>오늘은 급하거나 연체된 할일이 없어요. 🎉</div>
+
+    <footer>
+      <a id="repoLink" href="#" target="_blank" rel="noopener">GitHub 저장소에서 전체 이슈 보기 →</a>
+    </footer>
+  </div>
+
+<script>
+  const OWNER = "hjjeong2929-cpu";
+  const REPO = "daily-task-tracker";
+  const TOKEN_KEY = "dtt_gh_token";
+  const API = `https://api.github.com/repos/${OWNER}/${REPO}`;
+  const RAW_HISTORY = `https://raw.githubusercontent.com/${OWNER}/${REPO}/main/data/history.json`;
+
+  const $ = (sel) => document.querySelector(sel);
+  const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
+
+  $("#todayLabel").textContent = todayStr + " (KST)";
+  $("#repoLink").href = `https://github.com/${OWNER}/${REPO}/issues`;
+
+  function getToken() {
+    return localStorage.getItem(TOKEN_KEY) || "";
+  }
+
+  function extractDueDate(title) {
+    const m = title.match(/\((\d{4}-\d{2}-\d{2})\)\s*$/);
+    return m ? m[1] : null;
+  }
+
+  function classify(issue) {
+    const due = extractDueDate(issue.title);
+    const labels = issue.labels.map((l) => (typeof l === "string" ? l : l.name));
+    const priority = ["P1", "P2", "P3"].find((p) => labels.includes(p)) || "P3";
+    const overdue = due !== null && due < todayStr;
+    const dueToday = due !== null && due === todayStr;
+    const category = labels.find((l) => !["P1", "P2", "P3", "recurring", "digest"].includes(l));
+    return { due, priority, overdue, dueToday, category, labels };
+  }
+
+  function sortKey(item) {
+    const { overdue, dueToday, priority } = item.info;
+    const bucket = overdue ? 0 : dueToday ? 1 : { P1: 2, P2: 3, P3: 4 }[priority];
+    return [bucket, item.info.due || "9999-99-99", item.issue.number];
+  }
+
+  async function ghFetch(path, opts = {}) {
+    const res = await fetch(`${API}${path}`, {
+      ...opts,
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        ...(opts.headers || {}),
+      },
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`GitHub API ${res.status}: ${body.slice(0, 200)}`);
+    }
+    return res.status === 204 ? null : res.json();
+  }
+
+  async function loadStats() {
+    try {
+      const res = await fetch(RAW_HISTORY, { cache: "no-store" });
+      if (!res.ok) return;
+      const history = await res.json();
+      renderStats(history);
+    } catch (e) {
+      // 통계 파일이 아직 없거나 못 불러와도 할일 목록엔 지장 없음
+    }
+  }
+
+  function computeStreak(history) {
+    let streak = 0;
+    for (let i = history.length - 1; i >= 0; i--) {
+      const e = history[i];
+      if (e.total > 0 && e.completed === e.total) streak++;
+      else break;
+    }
+    return streak;
+  }
+
+  function renderStats(history) {
+    if (!history.length) return;
+    const recent = history.slice(-14);
+    const strip = recent
+      .map((e) => (e.total === 0 ? "⬜" : e.completed === e.total ? "🟩" : e.completed > 0 ? "🟨" : "🟥"))
+      .join(" ");
+    const streak = computeStreak(history);
+    const scored = history.filter((e) => e.total > 0);
+    const avg = scored.length ? Math.round((scored.reduce((s, e) => s + e.completed / e.total, 0) / scored.length) * 100) : 0;
+
+    $("#statsBox").hidden = false;
+    $("#statsBox").innerHTML = `
+      <div class="row"><span>🔥 연속 완주 스트릭</span><span class="streak">${streak}일</span></div>
+      <div class="row"><span>최근 ${recent.length}일</span><span class="strip">${strip}</span></div>
+      <div class="row"><span>전체 평균 달성률</span><span>${avg}%</span></div>
+    `;
+  }
+
+  async function loadIssues() {
+    const list = $("#list");
+    const emptyMsg = $("#emptyMsg");
+    list.innerHTML = `<div class="empty">불러오는 중...</div>`;
+    emptyMsg.hidden = true;
+
+    let issues;
+    try {
+      issues = await ghFetch("/issues?state=open&per_page=100");
+    } catch (e) {
+      list.innerHTML = `<div class="error">불러오기 실패: ${e.message}<br/>토큰 권한(repo)을 확인해주세요.</div>`;
+      return;
+    }
+
+    const items = issues
+      .filter((issue) => !issue.pull_request)
+      .filter((issue) => !issue.labels.some((l) => (typeof l === "string" ? l : l.name) === "digest"))
+      .map((issue) => ({ issue, info: classify(issue) }))
+      .sort((a, b) => {
+        const ka = sortKey(a), kb = sortKey(b);
+        for (let i = 0; i < ka.length; i++) {
+          if (ka[i] < kb[i]) return -1;
+          if (ka[i] > kb[i]) return 1;
+        }
+        return 0;
+      });
+
+    list.innerHTML = "";
+    if (!items.length) {
+      emptyMsg.hidden = false;
+      return;
+    }
+
+    for (const item of items) {
+      list.appendChild(renderCard(item));
+    }
+  }
+
+  function renderCard({ issue, info }) {
+    const card = document.createElement("div");
+    card.className = "card" + (info.overdue ? " overdue" : info.dueToday ? " due-today" : "");
+
+    const box = document.createElement("div");
+    box.className = "checkbox";
+    box.title = "완료 처리 (이슈 Close)";
+    box.addEventListener("click", () => closeIssue(issue.number, card));
+
+    const body = document.createElement("div");
+    body.className = "card-body";
+
+    const title = document.createElement("div");
+    title.className = "card-title";
+    const link = document.createElement("a");
+    link.href = issue.html_url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = issue.title.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/, "");
+    title.appendChild(link);
+
+    const tags = document.createElement("div");
+    tags.className = "tags";
+    if (info.overdue) tags.appendChild(makeTag(`연체 (${info.due})`, "overdue"));
+    else if (info.dueToday) tags.appendChild(makeTag("오늘 마감", "today"));
+    tags.appendChild(makeTag(info.priority, info.priority.toLowerCase()));
+    if (info.category) tags.appendChild(makeTag(info.category, "category"));
+
+    body.appendChild(title);
+    body.appendChild(tags);
+    card.appendChild(box);
+    card.appendChild(body);
+    return card;
+  }
+
+  function makeTag(text, cls) {
+    const span = document.createElement("span");
+    span.className = "tag " + cls;
+    span.textContent = text;
+    return span;
+  }
+
+  async function closeIssue(number, card) {
+    card.classList.add("closing");
+    try {
+      await ghFetch(`/issues/${number}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state: "closed" }),
+      });
+      setTimeout(() => {
+        card.remove();
+        if (!$("#list").children.length) $("#emptyMsg").hidden = false;
+      }, 250);
+    } catch (e) {
+      card.classList.remove("closing");
+      alert("완료 처리 실패: " + e.message);
+    }
+  }
+
+  function showGate() {
+    $("#gate").hidden = false;
+    $("#toolbar").hidden = true;
+  }
+
+  function showApp() {
+    $("#gate").hidden = true;
+    $("#toolbar").hidden = false;
+    loadStats();
+    loadIssues();
+  }
+
+  $("#saveTokenBtn").addEventListener("click", () => {
+    const val = $("#tokenInput").value.trim();
+    if (!val) return;
+    localStorage.setItem(TOKEN_KEY, val);
+    $("#gateError").hidden = true;
+    showApp();
+  });
+
+  $("#refreshBtn").addEventListener("click", () => {
+    loadStats();
+    loadIssues();
+  });
+
+  $("#logoutBtn").addEventListener("click", () => {
+    localStorage.removeItem(TOKEN_KEY);
+    showGate();
+  });
+
+  if (getToken()) {
+    showApp();
+  } else {
+    showGate();
+  }
+</script>
+</body>
+</html>
