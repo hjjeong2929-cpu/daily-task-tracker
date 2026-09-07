@@ -342,7 +342,7 @@
     // dot counts per day (non-period issues due that day)
     const dotCounts = {};
     allIssues.forEach((i) => {
-      if (i.isDigest || i.isPeriod || !i.due) return;
+      if (i.isDigest || i.isPeriod || i.isSkipped || !i.due) return;
       const [y, m] = i.due.split("-").map(Number);
       if (y === calYear && m === calMonth + 1) {
         dotCounts[i.due] = (dotCounts[i.due] || 0) + 1;
