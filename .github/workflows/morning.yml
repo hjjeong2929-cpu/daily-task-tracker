@@ -2,8 +2,7 @@ name: Morning - Create Tasks & Digest
 
 on:
   schedule:
-    # 매일 06:00 KST = 전날 21:00 UTC
-    - cron: "0 21 * * *"
+    - cron: "0 21 * * *" # 06:00 KST
   workflow_dispatch: {}
 
 permissions:
@@ -15,20 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: pip install pyyaml
-
-      - name: Create today's recurring task issues
+          python-version: "3.12"
+      - name: Create today's recurring task instances
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/create_recurring_issues.py
-
-      - name: Build today's digest
+      - name: Create today's digest issue
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/daily_digest.py

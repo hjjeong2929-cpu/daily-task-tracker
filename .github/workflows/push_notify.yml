@@ -1,0 +1,24 @@
+name: Push Notify - Fixed Time Reminders
+
+on:
+  schedule:
+    - cron: "30 7 * * *" # 16:30 KST
+    - cron: "30 12 * * *" # 21:30 KST
+  workflow_dispatch: {}
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Post self-mention comment (triggers GitHub Mobile push)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/notify_push.py

@@ -1,0 +1,17 @@
+[
+  {
+    "id": "water",
+    "title": "물 2L 마시기",
+    "days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+  },
+  {
+    "id": "exercise",
+    "title": "운동 30분",
+    "days": ["mon", "wed", "fri"]
+  },
+  {
+    "id": "weekly-retro",
+    "title": "주간 회고 쓰기",
+    "days": ["sun"]
+  }
+]

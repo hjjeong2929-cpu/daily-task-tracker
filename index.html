@@ -1,403 +1,733 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="utf-8" />
+<meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>오늘의 할일 — daily-task-tracker</title>
+<title>Daily Task Tracker</title>
 <style>
   :root {
-    --bg: #f7f7f8;
-    --card: #ffffff;
-    --border: #e6e6ea;
-    --text: #1c1c1f;
-    --muted: #75757f;
-    --p1: #d73a4a;
-    --p2: #b8860b;
-    --p3: #0e8a16;
-    --overdue-bg: #fdecec;
-    --today-bg: #fff8e6;
-    --accent: #2f6fed;
+    --blue: #2563eb;
+    --blue-light: #eff6ff;
+    --green: #16a34a;
+    --gray: #6b7280;
+    --border: #e5e7eb;
+    --bg: #fafafa;
+    --danger: #ef4444;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif;
-    padding: 24px 16px 64px;
+    color: #111827;
   }
-  .wrap { max-width: 640px; margin: 0 auto; }
-  header { margin-bottom: 20px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .date { color: var(--muted); font-size: 14px; }
-
-  .stats {
-    background: var(--card);
-    border: 1px solid var(--border);
+  #gate {
+    max-width: 420px;
+    margin: 80px auto;
+    padding: 24px;
+    background: white;
     border-radius: 12px;
-    padding: 14px 16px;
-    margin: 16px 0 20px;
-    font-size: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.1);
   }
-  .stats .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .stats .row:last-child { margin-bottom: 0; }
-  .streak { font-weight: 700; font-size: 16px; }
-  .strip { letter-spacing: 2px; }
-
-  .toolbar { display: flex; gap: 8px; margin-bottom: 14px; }
-  button {
-    font: inherit;
-    border: 1px solid var(--border);
-    background: var(--card);
-    border-radius: 8px;
-    padding: 6px 12px;
-    cursor: pointer;
-    color: var(--text);
+  #gate h2 { margin-top: 0; font-size: 18px; }
+  #gate input {
+    width: 100%; padding: 12px; font-size: 16px;
+    border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px;
   }
-  button:hover { background: #f0f0f2; }
-  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-  button.primary:hover { opacity: 0.9; }
+  #gate button, .primary-btn {
+    width: 100%; padding: 12px; font-size: 16px; font-weight: 600;
+    background: var(--blue); color: white; border: none; border-radius: 8px;
+  }
+  #app { max-width: 480px; margin: 0 auto; padding: 16px 16px 48px; }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  header h1 { font-size: 20px; margin: 0; }
+  #refreshBtn { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 14px; }
 
+  #calendar { background: white; border-radius: 12px; padding: 12px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .cal-header button { border: none; background: none; font-size: 20px; padding: 4px 12px; cursor: pointer; }
+  .cal-header span { font-weight: 600; font-size: 15px; }
+  #calGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .cal-dow { text-align: center; font-size: 11px; color: var(--gray); padding: 4px 0; }
+  .cal-cell {
+    position: relative; aspect-ratio: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-start; padding-top: 4px;
+    border-radius: 8px; font-size: 13px; cursor: pointer; min-height: 40px;
+  }
+  .cal-cell.empty { cursor: default; }
+  .cal-cell.today { font-weight: 700; color: var(--blue); }
+  .cal-cell.selected { background: var(--blue); color: white; }
+  .cal-cell .dots { display: flex; gap: 2px; margin-top: 2px; }
+  .cal-cell .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--blue); }
+  .cal-cell.selected .dot { background: white; }
+  .cal-bar-row { grid-column: 1 / -1; height: 6px; margin-top: -2px; position: relative; }
+  .period-bar {
+    position: absolute; height: 6px; border-radius: 3px; background: #f59e0b; top: 0;
+  }
+  #selectedDateBar { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+  #selectedDateLabel { font-size: 14px; font-weight: 600; color: var(--gray); }
+  #todayBtn { border: none; background: var(--blue-light); color: var(--blue); padding: 6px 12px; border-radius: 999px; font-size: 12px; }
+
+  #stats { background: white; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; font-size: 13px; color: var(--gray); }
+
+  #cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
   .card {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 12px 14px;
-    margin-bottom: 10px;
-    transition: opacity 0.25s ease, transform 0.25s ease;
+    display: flex; align-items: center; gap: 12px; background: white;
+    border-radius: 12px; padding: 10px 12px; box-shadow: 0 1px 2px rgba(0,0,0,.05);
   }
-  .card.overdue { background: var(--overdue-bg); }
-  .card.due-today { background: var(--today-bg); }
-  .card.closing { opacity: 0; transform: translateX(8px); }
-
+  .card.closed { opacity: .55; }
   .checkbox {
-    width: 20px; height: 20px;
-    border-radius: 6px;
-    border: 2px solid #c7c7cf;
-    flex: none;
-    margin-top: 2px;
-    cursor: pointer;
-    background: #fff;
+    flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+    border: 2px solid #d1d5db; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
   }
-  .checkbox:hover { border-color: var(--accent); }
+  .checkbox-hit { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; margin: -7px; cursor: pointer; }
+  .card.closed .checkbox { background: var(--green); border-color: var(--green); color: white; }
+  .card-title { flex: 1; font-size: 15px; }
+  .card.closed .card-title { text-decoration: line-through; color: var(--gray); }
+  .tag { font-size: 11px; padding: 2px 6px; border-radius: 6px; background: #f3f4f6; color: var(--gray); margin-left: 6px; }
+  .skip-btn { border: none; background: none; color: var(--gray); font-size: 18px; padding: 4px 8px; cursor: pointer; }
+  #emptyState { text-align: center; color: var(--gray); padding: 24px 0; font-size: 14px; }
 
-  .card-body { flex: 1; min-width: 0; }
-  .card-title { font-size: 15px; font-weight: 600; word-break: break-word; }
-  .card-title a { color: inherit; text-decoration: none; }
-  .card-title a:hover { text-decoration: underline; }
-  .tags { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
-  .tag {
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 999px;
-    color: #fff;
-    font-weight: 600;
-  }
-  .tag.p1 { background: var(--p1); }
-  .tag.p2 { background: var(--p2); }
-  .tag.p3 { background: var(--p3); }
-  .tag.category { background: #6b6b76; }
-  .tag.overdue { background: #b91c1c; }
-  .tag.today { background: #b8860b; }
+  #addArea, #periodArea, #recurringArea { background: white; border-radius: 12px; padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .add-row { display: flex; gap: 8px; }
+  .add-row input { flex: 1; padding: 12px; font-size: 15px; border: 1px solid var(--border); border-radius: 8px; }
+  .add-row button { padding: 0 14px; border: 1px solid var(--border); border-radius: 8px; background: white; font-size: 14px; white-space: nowrap; }
+  #addBtn { background: var(--blue); color: white; border-color: var(--blue); }
 
-  .empty {
-    text-align: center;
-    color: var(--muted);
-    padding: 40px 0;
-    font-size: 14px;
-  }
+  #favDropdown { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .fav-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 4px; font-size: 14px; border-bottom: 1px solid #f3f4f6; }
+  .fav-item span { cursor: pointer; flex: 1; }
+  .fav-remove { border: none; background: none; color: var(--gray); font-size: 16px; padding: 4px 8px; }
+  .fav-add-row { display: flex; gap: 8px; margin-top: 8px; }
+  .fav-add-row input { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; }
+  .fav-add-row button { padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: #f9fafb; }
+  #favEmpty { color: var(--gray); font-size: 13px; padding: 8px 4px; }
 
-  .gate {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
-    font-size: 14px;
-    line-height: 1.6;
+  details.section-toggle summary { font-size: 14px; font-weight: 600; cursor: pointer; padding: 2px 0; }
+  .form-row { margin-top: 10px; }
+  .form-row label { display: block; font-size: 12px; color: var(--gray); margin-bottom: 4px; }
+  .form-row input[type="text"], .form-row input[type="date"] {
+    width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;
   }
-  .gate input {
-    width: 100%;
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    font: inherit;
-    margin: 10px 0;
+  .day-toggles { display: flex; gap: 4px; margin-top: 6px; }
+  .day-toggle {
+    flex: 1; text-align: center; padding: 8px 0; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px; cursor: pointer; user-select: none;
   }
-  .gate a { color: var(--accent); }
-  .error {
-    color: #b91c1c;
-    font-size: 13px;
-    margin-top: 8px;
+  .day-toggle.active { background: var(--blue); color: white; border-color: var(--blue); }
+  .range-row { display: flex; gap: 8px; }
+  .range-row .form-row { flex: 1; }
+  .submit-btn {
+    margin-top: 12px; width: 100%; padding: 12px; border: none; border-radius: 8px;
+    background: var(--blue); color: white; font-size: 15px; font-weight: 600;
   }
-  footer { margin-top: 28px; text-align: center; color: var(--muted); font-size: 12px; }
-  footer a { color: inherit; }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <h1>✅ 오늘의 할일</h1>
-      <div class="date" id="todayLabel"></div>
-    </header>
 
-    <div id="statsBox" class="stats" hidden></div>
+<div id="gate">
+  <h2>GitHub Personal Access Token 입력</h2>
+  <p style="font-size:13px;color:#6b7280;">repo 권한이 있는 토큰이 필요해요. 이 브라우저에만 저장되고 어디로도 전송되지 않아요.</p>
+  <input id="tokenInput" type="password" placeholder="ghp_..." />
+  <button id="saveTokenBtn">저장하고 시작</button>
+</div>
 
-    <div class="toolbar" id="toolbar" hidden>
-      <button id="refreshBtn">🔄 새로고침</button>
-      <button id="logoutBtn">토큰 지우기</button>
+<div id="app" hidden>
+  <header>
+    <h1>✅ Daily Task Tracker</h1>
+    <button id="refreshBtn">새로고침</button>
+  </header>
+
+  <section id="calendar">
+    <div class="cal-header">
+      <button id="prevMonth">‹</button>
+      <span id="monthLabel"></span>
+      <button id="nextMonth">›</button>
     </div>
+    <div id="calGrid"></div>
+    <div id="selectedDateBar">
+      <span id="selectedDateLabel"></span>
+      <button id="todayBtn" hidden>오늘로 돌아가기</button>
+    </div>
+  </section>
 
-    <div id="gate" class="gate" hidden>
-      <strong>GitHub 토큰이 필요해요</strong><br />
-      이 페이지에서 할일을 체크(완료)하려면 <code>repo</code> 권한이 있는 Personal Access Token이 필요합니다.
-      <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">여기서 만들기</a>
-      (이미 만든 토큰이 있다면 그걸 그대로 써도 돼요)<br />
-      <input id="tokenInput" type="password" placeholder="ghp_..." autocomplete="off" />
-      <button class="primary" id="saveTokenBtn">저장하고 불러오기</button>
-      <div class="error" id="gateError" hidden></div>
-      <div style="margin-top:10px; color:var(--muted); font-size:12px;">
-        토큰은 이 브라우저에만 저장되고(localStorage), 다른 곳으로 전송되지 않아요. GitHub API로 직접 요청을 보낼 때만 사용됩니다.
+  <section id="stats"><span id="statsText">불러오는 중...</span></section>
+
+  <section id="cards"></section>
+  <div id="emptyState" hidden>이 날짜엔 등록된 할일이 없어요.</div>
+
+  <section id="addArea">
+    <div class="add-row">
+      <input id="newTitle" type="text" placeholder="할일 입력..." />
+      <button id="favBtn">즐겨찾기 ▾</button>
+    </div>
+    <div class="add-row" style="margin-top:8px;">
+      <button id="addBtn" style="flex:1;">선택한 날짜에 추가</button>
+    </div>
+    <div id="favDropdown" hidden>
+      <div id="favList"></div>
+      <div id="favEmpty" hidden>즐겨찾기가 없어요.</div>
+      <div class="fav-add-row">
+        <input id="favNewInput" type="text" placeholder="새 즐겨찾기 문구" />
+        <button id="favAddBtn">저장</button>
       </div>
     </div>
+  </section>
 
-    <div id="list"></div>
-    <div id="emptyMsg" class="empty" hidden>오늘은 급하거나 연체된 할일이 없어요. 🎉</div>
+  <details class="section-toggle">
+    <summary>+ Period 할일 등록 (기간의 마지막 날에만 노출)</summary>
+    <div class="form-row">
+      <label>제목</label>
+      <input id="periodTitle" type="text" placeholder="예: 분기 보고서 제출" />
+    </div>
+    <div class="range-row">
+      <div class="form-row">
+        <label>시작일</label>
+        <input id="periodStart" type="date" />
+      </div>
+      <div class="form-row">
+        <label>종료일</label>
+        <input id="periodEnd" type="date" />
+      </div>
+    </div>
+    <button id="periodAddBtn" class="submit-btn">Period 할일 등록</button>
+  </details>
 
-    <footer>
-      <a id="repoLink" href="#" target="_blank" rel="noopener">GitHub 저장소에서 전체 이슈 보기 →</a>
-    </footer>
-  </div>
+  <details class="section-toggle" style="margin-top:8px;">
+    <summary>+ 반복 할일 등록 (요일 + 기간 지정)</summary>
+    <div class="form-row">
+      <label>제목</label>
+      <input id="recTitle" type="text" placeholder="예: 스트레칭" />
+    </div>
+    <div class="form-row">
+      <label>요일 (여러 개 선택 가능)</label>
+      <div class="day-toggles" id="dayToggles"></div>
+    </div>
+    <div class="form-row">
+      <label><input type="checkbox" id="recHasRange" /> 기간 지정 (체크 안 하면 무기한 반복)</label>
+    </div>
+    <div class="range-row" id="recRangeInputs" hidden>
+      <div class="form-row">
+        <label>시작일</label>
+        <input id="recStart" type="date" />
+      </div>
+      <div class="form-row">
+        <label>종료일</label>
+        <input id="recEnd" type="date" />
+      </div>
+    </div>
+    <button id="recAddBtn" class="submit-btn">반복 할일 등록</button>
+    <p style="font-size:12px;color:#6b7280;margin-top:8px;">참고: 여기서 등록하면 내일 아침부터 자동 반영돼요. 오늘 이미 지나간 자동 생성 시점에는 소급 적용되지 않아요.</p>
+  </details>
+</div>
 
 <script>
+(function () {
   const OWNER = "hjjeong2929-cpu";
   const REPO = "daily-task-tracker";
   const TOKEN_KEY = "dtt_gh_token";
   const API = `https://api.github.com/repos/${OWNER}/${REPO}`;
-  const RAW_HISTORY = `https://raw.githubusercontent.com/${OWNER}/${REPO}/main/data/history.json`;
+  const DIGEST_LABEL = "digest";
+  const SKIPPED_LABEL = "skipped";
+  const PERIOD_LABEL = "period";
+  const RECURRING_LABEL = "recurring";
+  const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+  const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
-  const $ = (sel) => document.querySelector(sel);
-  const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
-
-  $("#todayLabel").textContent = todayStr + " (KST)";
-  $("#repoLink").href = `https://github.com/${OWNER}/${REPO}/issues`;
-
-  function getToken() {
-    return localStorage.getItem(TOKEN_KEY) || "";
+  let token = localStorage.getItem(TOKEN_KEY) || "";
+  let allIssues = []; // parsed cache
+  let selectedDate = todayKST(); // "YYYY-MM-DD"
+  let calYear, calMonth; // calMonth: 0-11
+  {
+    const [y, m] = selectedDate.split("-").map(Number);
+    calYear = y; calMonth = m - 1;
   }
+  let selectedDays = new Set(); // for recurring form
 
+  // ---------- date helpers ----------
+  function todayKST() {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
+  }
+  function pad2(n) { return String(n).padStart(2, "0"); }
+  function ymd(y, m, d) { return `${y}-${pad2(m + 1)}-${pad2(d)}`; }
+  function daysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
   function extractDueDate(title) {
     const m = title.match(/\((\d{4}-\d{2}-\d{2})\)\s*$/);
     return m ? m[1] : null;
   }
-
-  function classify(issue) {
-    const due = extractDueDate(issue.title);
-    const labels = issue.labels.map((l) => (typeof l === "string" ? l : l.name));
-    const priority = ["P1", "P2", "P3"].find((p) => labels.includes(p)) || "P3";
-    const overdue = due !== null && due < todayStr;
-    const dueToday = due !== null && due === todayStr;
-    const category = labels.find((l) => !["P1", "P2", "P3", "recurring", "digest"].includes(l));
-    return { due, priority, overdue, dueToday, category, labels };
+  function stripDueDate(title) {
+    return title.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/, "");
+  }
+  function extractPeriodStart(body) {
+    if (!body) return null;
+    const m = body.match(/<!--\s*period_start:\s*(\d{4}-\d{2}-\d{2})\s*-->/);
+    return m ? m[1] : null;
+  }
+  function formatKoreanDate(dateStr) {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const wd = ["일", "월", "화", "수", "목", "금", "토"][new Date(y, m - 1, d).getDay()];
+    return `${y}년 ${m}월 ${d}일 (${wd})`;
   }
 
-  function sortKey(item) {
-    const { overdue, dueToday, priority } = item.info;
-    const bucket = overdue ? 0 : dueToday ? 1 : { P1: 2, P2: 3, P3: 4 }[priority];
-    return [bucket, item.info.due || "9999-99-99", item.issue.number];
-  }
-
+  // ---------- GitHub API ----------
   async function ghFetch(path, opts = {}) {
-    const res = await fetch(`${API}${path}`, {
+    const res = await fetch(path.startsWith("http") ? path : `${API}${path}`, {
       ...opts,
       headers: {
-        Authorization: `Bearer ${getToken()}`,
+        Authorization: `Bearer ${token}`,
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
+        ...(opts.body ? { "Content-Type": "application/json" } : {}),
         ...(opts.headers || {}),
       },
     });
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`GitHub API ${res.status}: ${body.slice(0, 200)}`);
+      const text = await res.text();
+      throw new Error(`${opts.method || "GET"} ${path} -> ${res.status}: ${text}`);
     }
-    return res.status === 204 ? null : res.json();
+    if (res.status === 204) return null;
+    return res.json();
   }
 
+  async function loadAllIssues() {
+    let results = [];
+    for (let page = 1; page <= 6; page++) {
+      const data = await ghFetch(`/issues?state=all&per_page=100&page=${page}`);
+      if (!data || data.length === 0) break;
+      results = results.concat(data.filter((i) => !i.pull_request));
+      if (data.length < 100) break;
+    }
+    allIssues = results.map((issue) => {
+      const labelNames = (issue.labels || []).map((l) => (typeof l === "string" ? l : l.name));
+      return {
+        number: issue.number,
+        title: issue.title,
+        state: issue.state,
+        body: issue.body,
+        labels: labelNames,
+        due: extractDueDate(issue.title),
+        periodStart: labelNames.includes(PERIOD_LABEL) ? extractPeriodStart(issue.body) : null,
+        isDigest: labelNames.includes(DIGEST_LABEL),
+        isPeriod: labelNames.includes(PERIOD_LABEL),
+        isRecurring: labelNames.includes(RECURRING_LABEL),
+        isSkipped: labelNames.includes(SKIPPED_LABEL),
+      };
+    });
+  }
+
+  function issuesForDate(dateStr) {
+    return allIssues
+      .filter((i) => !i.isDigest && i.due === dateStr)
+      .sort((a, b) => (a.state === b.state ? a.number - b.number : a.state === "open" ? -1 : 1));
+  }
+
+  // ---------- calendar ----------
+  function renderCalendar() {
+    document.getElementById("monthLabel").textContent = `${calYear}년 ${calMonth + 1}월`;
+    const grid = document.getElementById("calGrid");
+    grid.innerHTML = "";
+    DAY_LABELS.forEach((d) => {
+      const el = document.createElement("div");
+      el.className = "cal-dow";
+      el.textContent = d;
+      grid.appendChild(el);
+    });
+
+    const firstDow = new Date(calYear, calMonth, 1).getDay();
+    const total = daysInMonth(calYear, calMonth);
+    const today = todayKST();
+
+    // dot counts per day (non-period issues due that day)
+    const dotCounts = {};
+    allIssues.forEach((i) => {
+      if (i.isDigest || i.isPeriod || !i.due) return;
+      const [y, m] = i.due.split("-").map(Number);
+      if (y === calYear && m === calMonth + 1) {
+        dotCounts[i.due] = (dotCounts[i.due] || 0) + 1;
+      }
+    });
+
+    for (let i = 0; i < firstDow; i++) {
+      const el = document.createElement("div");
+      el.className = "cal-cell empty";
+      grid.appendChild(el);
+    }
+    for (let d = 1; d <= total; d++) {
+      const dateStr = ymd(calYear, calMonth, d);
+      const cell = document.createElement("div");
+      cell.className = "cal-cell";
+      if (dateStr === today) cell.classList.add("today");
+      if (dateStr === selectedDate) cell.classList.add("selected");
+      const num = document.createElement("div");
+      num.textContent = d;
+      cell.appendChild(num);
+      const count = dotCounts[dateStr] || 0;
+      if (count > 0) {
+        const dots = document.createElement("div");
+        dots.className = "dots";
+        for (let k = 0; k < Math.min(count, 4); k++) {
+          const dot = document.createElement("div");
+          dot.className = "dot";
+          dots.appendChild(dot);
+        }
+        cell.appendChild(dots);
+      }
+      cell.addEventListener("click", () => {
+        selectedDate = dateStr;
+        renderCalendar();
+        renderSelectedBar();
+        renderList();
+      });
+      grid.appendChild(cell);
+    }
+
+    renderPeriodBars(firstDow, total);
+  }
+
+  function renderPeriodBars(firstDow, totalDays) {
+    const container = document.getElementById("calGrid");
+    const monthStart = ymd(calYear, calMonth, 1);
+    const monthEnd = ymd(calYear, calMonth, totalDays);
+    allIssues
+      .filter((i) => i.isPeriod && i.periodStart && i.due)
+      .filter((i) => i.periodStart <= monthEnd && i.due >= monthStart)
+      .forEach((i) => {
+        const startD = i.periodStart < monthStart ? 1 : Number(i.periodStart.split("-")[2]);
+        const endD = i.due > monthEnd ? totalDays : Number(i.due.split("-")[2]);
+        const bar = document.createElement("div");
+        bar.className = "period-bar";
+        bar.title = stripDueDate(i.title);
+        const colStart = ((startD - 1 + firstDow) % 7) + 1;
+        const rowIndex = Math.floor((startD - 1 + firstDow) / 7);
+        bar.style.position = "absolute";
+        bar.style.left = `calc(${((colStart - 1) / 7) * 100}% + 2px)`;
+        bar.style.width = `calc(${((Math.min(endD, startD + (7 - colStart)) - startD + 1) / 7) * 100}% - 4px)`;
+        bar.style.top = `${44 + rowIndex * 46}px`;
+        container.style.position = "relative";
+        container.appendChild(bar);
+      });
+  }
+
+  function renderSelectedBar() {
+    document.getElementById("selectedDateLabel").textContent = formatKoreanDate(selectedDate);
+    document.getElementById("todayBtn").hidden = selectedDate === todayKST();
+  }
+
+  // ---------- task list ----------
+  function renderList() {
+    const cardsEl = document.getElementById("cards");
+    const emptyEl = document.getElementById("emptyState");
+    cardsEl.innerHTML = "";
+    const items = issuesForDate(selectedDate);
+    emptyEl.hidden = items.length > 0;
+    items.forEach((issue) => {
+      const card = document.createElement("div");
+      card.className = "card" + (issue.state === "closed" ? " closed" : "");
+
+      const hit = document.createElement("div");
+      hit.className = "checkbox-hit";
+      const box = document.createElement("div");
+      box.className = "checkbox";
+      box.textContent = issue.state === "closed" ? "✓" : "";
+      hit.appendChild(box);
+      hit.addEventListener("click", () => toggleComplete(issue));
+      card.appendChild(hit);
+
+      const titleEl = document.createElement("div");
+      titleEl.className = "card-title";
+      titleEl.textContent = stripDueDate(issue.title);
+      if (issue.isPeriod) {
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = "Period";
+        titleEl.appendChild(tag);
+      }
+      card.appendChild(titleEl);
+
+      if (issue.isRecurring && issue.state === "open") {
+        const skipBtn = document.createElement("button");
+        skipBtn.className = "skip-btn";
+        skipBtn.textContent = "✕";
+        skipBtn.title = "오늘은 해당 없음 (삭제)";
+        skipBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          skipInstance(issue);
+        });
+        card.appendChild(skipBtn);
+      }
+
+      cardsEl.appendChild(card);
+    });
+  }
+
+  async function toggleComplete(issue) {
+    const newState = issue.state === "closed" ? "open" : "closed";
+    await ghFetch(`/issues/${issue.number}`, { method: "PATCH", body: JSON.stringify({ state: newState }) });
+    issue.state = newState;
+    renderList();
+    renderCalendar();
+  }
+
+  async function skipInstance(issue) {
+    const newLabels = Array.from(new Set([...issue.labels, SKIPPED_LABEL]));
+    await ghFetch(`/issues/${issue.number}`, {
+      method: "PATCH",
+      body: JSON.stringify({ state: "closed", labels: newLabels }),
+    });
+    allIssues = allIssues.filter((i) => i.number !== issue.number);
+    renderList();
+    renderCalendar();
+  }
+
+  async function addTask(titleText, dateStr) {
+    if (!titleText.trim()) return;
+    const title = `${titleText.trim()} (${dateStr})`;
+    const issue = await ghFetch(`/issues`, {
+      method: "POST",
+      body: JSON.stringify({ title, assignees: [OWNER] }),
+    });
+    allIssues.push({
+      number: issue.number,
+      title: issue.title,
+      state: "open",
+      body: issue.body,
+      labels: [],
+      due: dateStr,
+      periodStart: null,
+      isDigest: false,
+      isPeriod: false,
+      isRecurring: false,
+      isSkipped: false,
+    });
+    renderList();
+    renderCalendar();
+  }
+
+  // ---------- favorites (data/favorites.json via Contents API) ----------
+  let favoritesSha = null;
+  async function loadFavorites() {
+    try {
+      const data = await ghFetch(`/contents/data/favorites.json`);
+      favoritesSha = data.sha;
+      return JSON.parse(decodeURIComponent(escape(atob(data.content))));
+    } catch (e) {
+      favoritesSha = null;
+      return [];
+    }
+  }
+  async function saveFavorites(list, message) {
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(list, null, 2) + "\n")));
+    const payload = { message, content };
+    if (favoritesSha) payload.sha = favoritesSha;
+    const res = await ghFetch(`/contents/data/favorites.json`, { method: "PUT", body: JSON.stringify(payload) });
+    favoritesSha = res.content.sha;
+  }
+  async function renderFavDropdown() {
+    const list = await loadFavorites();
+    const favList = document.getElementById("favList");
+    const favEmpty = document.getElementById("favEmpty");
+    favList.innerHTML = "";
+    favEmpty.hidden = list.length > 0;
+    list.forEach((title) => {
+      const row = document.createElement("div");
+      row.className = "fav-item";
+      const span = document.createElement("span");
+      span.textContent = title;
+      span.addEventListener("click", async () => {
+        await addTask(title, selectedDate);
+        document.getElementById("favDropdown").hidden = true;
+      });
+      row.appendChild(span);
+      const rm = document.createElement("button");
+      rm.className = "fav-remove";
+      rm.textContent = "✕";
+      rm.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const updated = list.filter((t) => t !== title);
+        await saveFavorites(updated, `chore: 즐겨찾기 삭제 - ${title}`);
+        renderFavDropdown();
+      });
+      row.appendChild(rm);
+      favList.appendChild(row);
+    });
+  }
+
+  // ---------- recurring rules (data/recurring_rules.json via Contents API) ----------
+  async function loadRecurringRules() {
+    const data = await ghFetch(`/contents/data/recurring_rules.json`);
+    return { sha: data.sha, rules: JSON.parse(decodeURIComponent(escape(atob(data.content)))) };
+  }
+  async function saveRecurringRules(rules, sha, message) {
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(rules, null, 2) + "\n")));
+    const payload = { message, content, sha };
+    await ghFetch(`/contents/data/recurring_rules.json`, { method: "PUT", body: JSON.stringify(payload) });
+  }
+
+  // ---------- stats (data/history.json, read-only raw fetch) ----------
   async function loadStats() {
     try {
-      const res = await fetch(RAW_HISTORY, { cache: "no-store" });
-      if (!res.ok) return;
+      const res = await fetch(
+        `https://raw.githubusercontent.com/${OWNER}/${REPO}/main/data/history.json?t=${Date.now()}`
+      );
       const history = await res.json();
-      renderStats(history);
+      const recent = history.slice(-14);
+      let streak = 0;
+      for (let i = history.length - 1; i >= 0; i--) {
+        const e = history[i];
+        if (e.total > 0 && e.completed === e.total) streak++;
+        else break;
+      }
+      const totalSum = recent.reduce((s, e) => s + e.total, 0);
+      const completedSum = recent.reduce((s, e) => s + e.completed, 0);
+      const avg = totalSum > 0 ? Math.round((completedSum / totalSum) * 100) : 0;
+      document.getElementById("statsText").textContent = `🔥 연속 ${streak}일 완료 · 최근 14일 평균 완료율 ${avg}%`;
     } catch (e) {
-      // 통계 파일이 아직 없거나 못 불러와도 할일 목록엔 지장 없음
+      document.getElementById("statsText").textContent = "아직 통계가 없어요.";
     }
   }
 
-  function computeStreak(history) {
-    let streak = 0;
-    for (let i = history.length - 1; i >= 0; i--) {
-      const e = history[i];
-      if (e.total > 0 && e.completed === e.total) streak++;
-      else break;
-    }
-    return streak;
-  }
-
-  function renderStats(history) {
-    if (!history.length) return;
-    const recent = history.slice(-14);
-    const strip = recent
-      .map((e) => (e.total === 0 ? "⬜" : e.completed === e.total ? "🟩" : e.completed > 0 ? "🟨" : "🟥"))
-      .join(" ");
-    const streak = computeStreak(history);
-    const scored = history.filter((e) => e.total > 0);
-    const avg = scored.length ? Math.round((scored.reduce((s, e) => s + e.completed / e.total, 0) / scored.length) * 100) : 0;
-
-    $("#statsBox").hidden = false;
-    $("#statsBox").innerHTML = `
-      <div class="row"><span>🔥 연속 완주 스트릭</span><span class="streak">${streak}일</span></div>
-      <div class="row"><span>최근 ${recent.length}일</span><span class="strip">${strip}</span></div>
-      <div class="row"><span>전체 평균 달성률</span><span>${avg}%</span></div>
-    `;
-  }
-
-  async function loadIssues() {
-    const list = $("#list");
-    const emptyMsg = $("#emptyMsg");
-    list.innerHTML = `<div class="empty">불러오는 중...</div>`;
-    emptyMsg.hidden = true;
-
-    let issues;
-    try {
-      issues = await ghFetch("/issues?state=open&per_page=100");
-    } catch (e) {
-      list.innerHTML = `<div class="error">불러오기 실패: ${e.message}<br/>토큰 권한(repo)을 확인해주세요.</div>`;
-      return;
-    }
-
-    const items = issues
-      .filter((issue) => !issue.pull_request)
-      .filter((issue) => !issue.labels.some((l) => (typeof l === "string" ? l : l.name) === "digest"))
-      .map((issue) => ({ issue, info: classify(issue) }))
-      .sort((a, b) => {
-        const ka = sortKey(a), kb = sortKey(b);
-        for (let i = 0; i < ka.length; i++) {
-          if (ka[i] < kb[i]) return -1;
-          if (ka[i] > kb[i]) return 1;
-        }
-        return 0;
+  // ---------- wiring ----------
+  function buildDayToggles() {
+    const wrap = document.getElementById("dayToggles");
+    wrap.innerHTML = "";
+    DAY_KEYS.forEach((key, idx) => {
+      const el = document.createElement("div");
+      el.className = "day-toggle";
+      el.textContent = DAY_LABELS[idx];
+      el.addEventListener("click", () => {
+        if (selectedDays.has(key)) selectedDays.delete(key);
+        else selectedDays.add(key);
+        el.classList.toggle("active");
       });
-
-    list.innerHTML = "";
-    if (!items.length) {
-      emptyMsg.hidden = false;
-      return;
-    }
-
-    for (const item of items) {
-      list.appendChild(renderCard(item));
-    }
+      wrap.appendChild(el);
+    });
   }
 
-  function renderCard({ issue, info }) {
-    const card = document.createElement("div");
-    card.className = "card" + (info.overdue ? " overdue" : info.dueToday ? " due-today" : "");
-
-    const box = document.createElement("div");
-    box.className = "checkbox";
-    box.title = "완료 처리 (이슈 Close)";
-    box.addEventListener("click", () => closeIssue(issue.number, card));
-
-    const body = document.createElement("div");
-    body.className = "card-body";
-
-    const title = document.createElement("div");
-    title.className = "card-title";
-    const link = document.createElement("a");
-    link.href = issue.html_url;
-    link.target = "_blank";
-    link.rel = "noopener";
-    link.textContent = issue.title.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/, "");
-    title.appendChild(link);
-
-    const tags = document.createElement("div");
-    tags.className = "tags";
-    if (info.overdue) tags.appendChild(makeTag(`연체 (${info.due})`, "overdue"));
-    else if (info.dueToday) tags.appendChild(makeTag("오늘 마감", "today"));
-    tags.appendChild(makeTag(info.priority, info.priority.toLowerCase()));
-    if (info.category) tags.appendChild(makeTag(info.category, "category"));
-
-    body.appendChild(title);
-    body.appendChild(tags);
-    card.appendChild(box);
-    card.appendChild(body);
-    return card;
-  }
-
-  function makeTag(text, cls) {
-    const span = document.createElement("span");
-    span.className = "tag " + cls;
-    span.textContent = text;
-    return span;
-  }
-
-  async function closeIssue(number, card) {
-    card.classList.add("closing");
-    try {
-      await ghFetch(`/issues/${number}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ state: "closed" }),
-      });
-      setTimeout(() => {
-        card.remove();
-        if (!$("#list").children.length) $("#emptyMsg").hidden = false;
-      }, 250);
-    } catch (e) {
-      card.classList.remove("closing");
-      alert("완료 처리 실패: " + e.message);
-    }
-  }
-
-  function showGate() {
-    $("#gate").hidden = false;
-    $("#toolbar").hidden = true;
-  }
-
-  function showApp() {
-    $("#gate").hidden = true;
-    $("#toolbar").hidden = false;
+  async function init() {
+    document.getElementById("gate").hidden = true;
+    document.getElementById("app").hidden = false;
+    buildDayToggles();
+    await loadAllIssues();
+    renderCalendar();
+    renderSelectedBar();
+    renderList();
     loadStats();
-    loadIssues();
   }
 
-  $("#saveTokenBtn").addEventListener("click", () => {
-    const val = $("#tokenInput").value.trim();
-    if (!val) return;
-    localStorage.setItem(TOKEN_KEY, val);
-    $("#gateError").hidden = true;
-    showApp();
+  document.getElementById("saveTokenBtn").addEventListener("click", () => {
+    const v = document.getElementById("tokenInput").value.trim();
+    if (!v) return;
+    token = v;
+    localStorage.setItem(TOKEN_KEY, v);
+    init();
   });
 
-  $("#refreshBtn").addEventListener("click", () => {
+  document.getElementById("refreshBtn").addEventListener("click", async () => {
+    await loadAllIssues();
+    renderCalendar();
+    renderList();
     loadStats();
-    loadIssues();
   });
 
-  $("#logoutBtn").addEventListener("click", () => {
-    localStorage.removeItem(TOKEN_KEY);
-    showGate();
+  document.getElementById("prevMonth").addEventListener("click", () => {
+    calMonth -= 1;
+    if (calMonth < 0) { calMonth = 11; calYear -= 1; }
+    renderCalendar();
+  });
+  document.getElementById("nextMonth").addEventListener("click", () => {
+    calMonth += 1;
+    if (calMonth > 11) { calMonth = 0; calYear += 1; }
+    renderCalendar();
+  });
+  document.getElementById("todayBtn").addEventListener("click", () => {
+    selectedDate = todayKST();
+    const [y, m] = selectedDate.split("-").map(Number);
+    calYear = y; calMonth = m - 1;
+    renderCalendar();
+    renderSelectedBar();
+    renderList();
   });
 
-  if (getToken()) {
-    showApp();
-  } else {
-    showGate();
-  }
+  document.getElementById("favBtn").addEventListener("click", () => {
+    const el = document.getElementById("favDropdown");
+    el.hidden = !el.hidden;
+    if (!el.hidden) renderFavDropdown();
+  });
+  document.getElementById("favAddBtn").addEventListener("click", async () => {
+    const input = document.getElementById("favNewInput");
+    const v = input.value.trim();
+    if (!v) return;
+    const list = await loadFavorites();
+    if (!list.includes(v)) list.push(v);
+    await saveFavorites(list, `chore: 즐겨찾기 추가 - ${v}`);
+    input.value = "";
+    renderFavDropdown();
+  });
+
+  document.getElementById("addBtn").addEventListener("click", async () => {
+    const input = document.getElementById("newTitle");
+    await addTask(input.value, selectedDate);
+    input.value = "";
+  });
+  document.getElementById("newTitle").addEventListener("keydown", async (e) => {
+    if (e.key === "Enter") document.getElementById("addBtn").click();
+  });
+
+  document.getElementById("periodAddBtn").addEventListener("click", async () => {
+    const title = document.getElementById("periodTitle").value.trim();
+    const start = document.getElementById("periodStart").value;
+    const end = document.getElementById("periodEnd").value;
+    if (!title || !start || !end) { alert("제목/시작일/종료일을 모두 입력해주세요."); return; }
+    const fullTitle = `${title} (${end})`;
+    const body = `<!-- period_start: ${start} -->\n기간: ${start} ~ ${end}`;
+    const issue = await ghFetch(`/issues`, {
+      method: "POST",
+      body: JSON.stringify({ title: fullTitle, body, labels: [PERIOD_LABEL], assignees: [OWNER] }),
+    });
+    allIssues.push({
+      number: issue.number, title: fullTitle, state: "open", body,
+      labels: [PERIOD_LABEL], due: end, periodStart: start,
+      isDigest: false, isPeriod: true, isRecurring: false, isSkipped: false,
+    });
+    document.getElementById("periodTitle").value = "";
+    document.getElementById("periodStart").value = "";
+    document.getElementById("periodEnd").value = "";
+    renderCalendar();
+    renderList();
+  });
+
+  document.getElementById("recHasRange").addEventListener("change", (e) => {
+    document.getElementById("recRangeInputs").hidden = !e.target.checked;
+  });
+
+  document.getElementById("recAddBtn").addEventListener("click", async () => {
+    const title = document.getElementById("recTitle").value.trim();
+    if (!title) { alert("제목을 입력해주세요."); return; }
+    if (selectedDays.size === 0) { alert("요일을 하나 이상 선택해주세요."); return; }
+    const hasRange = document.getElementById("recHasRange").checked;
+    const rule = { id: `rule-${Date.now()}`, title, days: Array.from(selectedDays) };
+    if (hasRange) {
+      const start = document.getElementById("recStart").value;
+      const end = document.getElementById("recEnd").value;
+      if (!start || !end) { alert("기간을 지정하려면 시작일/종료일을 모두 입력해주세요."); return; }
+      rule.start_date = start;
+      rule.end_date = end;
+    }
+    const { sha, rules } = await loadRecurringRules();
+    rules.push(rule);
+    await saveRecurringRules(rules, sha, `feat: 반복 할일 추가 - ${title}`);
+    document.getElementById("recTitle").value = "";
+    selectedDays = new Set();
+    buildDayToggles();
+    document.getElementById("recHasRange").checked = false;
+    document.getElementById("recRangeInputs").hidden = true;
+    alert("등록됐어요! 내일 아침부터 자동으로 생성됩니다.");
+  });
+
+  if (token) init();
+})();
 </script>
 </body>
 </html>

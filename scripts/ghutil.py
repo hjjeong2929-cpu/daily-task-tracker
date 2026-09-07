@@ -1,107 +1,169 @@
-"""GitHub REST API 호출을 위한 공용 헬퍼 모음.
+"""Shared GitHub API helper for the daily-task-tracker automation scripts.
 
-모든 스크립트가 이 모듈을 통해서만 GitHub API를 호출한다.
-GITHUB_TOKEN / GITHUB_REPOSITORY / GITHUB_REPOSITORY_OWNER 는
-GitHub Actions가 자동으로 넣어주는 환경 변수를 사용한다.
+No third-party dependencies (uses urllib only) so it runs on any GitHub
+Actions Python runner with zero setup.
 """
 import json
 import os
 import re
+import urllib.request
 import urllib.error
 import urllib.parse
-import urllib.request
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timezone, timedelta
 
 KST = timezone(timedelta(hours=9))
 
-# 제목 끝의 "(YYYY-MM-DD)" 를 마감일로 인식한다.
 DUE_DATE_RE = re.compile(r"\((\d{4}-\d{2}-\d{2})\)\s*$")
 
-PRIORITIES = ("P1", "P2", "P3")
-PRIORITY_COLORS = {"P1": "d73a4a", "P2": "fbca04", "P3": "0e8a16"}
 RECURRING_LABEL = "recurring"
-RECURRING_LABEL_COLOR = "1d76db"
 DIGEST_LABEL = "digest"
-DIGEST_LABEL_COLOR = "5319e7"
-CATEGORY_LABEL_COLOR = "c5def5"
+PERIOD_LABEL = "period"
+SKIPPED_LABEL = "skipped"
+
+PERIOD_START_RE = re.compile(r"<!--\s*period_start:\s*(\d{4}-\d{2}-\d{2})\s*-->")
 
 
-def today_kst() -> date:
+def today_kst():
     return datetime.now(KST).date()
 
 
-def now_kst() -> datetime:
+def now_kst():
     return datetime.now(KST)
 
 
-def extract_due_date(title: str):
-    m = DUE_DATE_RE.search(title)
+def extract_due_date(title):
+    """Return the (YYYY-MM-DD) date embedded at the end of an issue title, or None."""
+    m = DUE_DATE_RE.search(title.strip())
     if not m:
         return None
     try:
-        y, mo, d = m.group(1).split("-")
-        return date(int(y), int(mo), int(d))
+        return datetime.strptime(m.group(1), "%Y-%m-%d").date()
     except ValueError:
         return None
 
 
-def normalize_priority(value) -> str:
-    p = (value or "P2").upper()
-    return p if p in PRIORITIES else "P2"
+def extract_period_start(body):
+    """Return the period start date hidden in an issue body, or None."""
+    if not body:
+        return None
+    m = PERIOD_START_RE.search(body)
+    if not m:
+        return None
+    try:
+        return datetime.strptime(m.group(1), "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def strip_due_date(title):
+    return DUE_DATE_RE.sub("", title).strip()
 
 
 class GitHub:
-    def __init__(self, token=None, repo=None):
+    def __init__(self, token=None, repository=None):
         self.token = token or os.environ["GITHUB_TOKEN"]
-        self.repo = repo or os.environ["GITHUB_REPOSITORY"]
-        self.owner_login = os.environ.get("GITHUB_REPOSITORY_OWNER")
+        self.repository = repository or os.environ["GITHUB_REPOSITORY"]
+        self.owner_login, self.repo_name = self.repository.split("/", 1)
+        self.api_base = "https://api.github.com"
 
-    def request(self, method, path_or_url, body=None):
-        url = path_or_url if path_or_url.startswith("http") else f"https://api.github.com{path_or_url}"
-        data = json.dumps(body).encode("utf-8") if body is not None else None
+    def request(self, method, path, payload=None):
+        url = path if path.startswith("http") else f"{self.api_base}{path}"
+        data = json.dumps(payload).encode("utf-8") if payload is not None else None
         req = urllib.request.Request(url, data=data, method=method)
         req.add_header("Authorization", f"Bearer {self.token}")
         req.add_header("Accept", "application/vnd.github+json")
         req.add_header("X-GitHub-Api-Version", "2022-11-28")
         if data is not None:
             req.add_header("Content-Type", "application/json")
-        with urllib.request.urlopen(req) as resp:
-            raw = resp.read()
-            return json.loads(raw.decode("utf-8")) if raw else None
-
-    def search_issues(self, query, per_page=100):
-        url = f"/search/issues?q={urllib.parse.quote(query)}&per_page={per_page}"
-        result = self.request("GET", url)
-        return result.get("items", [])
-
-    def issue_exists_with_title(self, title) -> bool:
-        query = f'repo:{self.repo} is:issue in:title "{title}"'
-        return len(self.search_issues(query, per_page=1)) > 0
-
-    def ensure_label(self, name, color):
         try:
-            self.request("GET", f"/repos/{self.repo}/labels/{urllib.parse.quote(name)}")
+            with urllib.request.urlopen(req) as resp:
+                body = resp.read()
+                headers = dict(resp.headers)
+                return (json.loads(body) if body else None), headers
         except urllib.error.HTTPError as e:
-            if e.code == 404:
-                self.request("POST", f"/repos/{self.repo}/labels", {"name": name, "color": color})
-            else:
-                raise
+            err_body = e.read().decode("utf-8", "replace")
+            raise RuntimeError(f"{method} {url} -> {e.code}: {err_body}") from e
 
-    def create_issue(self, title, body, labels, assignee=None):
-        payload = {"title": title, "body": body, "labels": labels}
-        if assignee:
-            payload["assignees"] = [assignee]
-        return self.request("POST", f"/repos/{self.repo}/issues", payload)
+    # ---- issues -------------------------------------------------------
+    def search_issues(self, query):
+        data, _ = self.request(
+            "GET", f"/search/issues?q={urllib.parse.quote(query)}&per_page=100"
+        )
+        return data.get("items", [])
 
-    def list_open_issues(self, extra_query=""):
-        query = f"repo:{self.repo} is:issue is:open {extra_query}".strip()
-        return self.search_issues(query)
+    def issue_exists_with_title(self, title, state="open"):
+        query = f'repo:{self.repository} in:title "{title}" is:issue state:{state}'
+        items = self.search_issues(query)
+        return any(item["title"] == title for item in items)
 
-    def add_comment(self, issue_number, body):
-        return self.request("POST", f"/repos/{self.repo}/issues/{issue_number}/comments", {"body": body})
+    def ensure_label(self, name, color="ededed", description=""):
+        try:
+            self.request("GET", f"/repos/{self.repository}/labels/{name}")
+        except RuntimeError:
+            self.request(
+                "POST",
+                f"/repos/{self.repository}/labels",
+                {"name": name, "color": color, "description": description},
+            )
 
-    def list_comments(self, issue_number):
-        return self.request("GET", f"/repos/{self.repo}/issues/{issue_number}/comments")
+    def create_issue(self, title, body="", labels=None, assignees=None):
+        payload = {"title": title, "body": body}
+        if labels:
+            payload["labels"] = labels
+        if assignees:
+            payload["assignees"] = assignees
+        data, _ = self.request("POST", f"/repos/{self.repository}/issues", payload)
+        return data
 
-    def set_labels(self, issue_number, labels):
-        return self.request("PUT", f"/repos/{self.repo}/issues/{issue_number}/labels", {"labels": labels})
+    def list_issues(self, state="open", labels=None, per_page=100, max_pages=5):
+        results = []
+        page = 1
+        while page <= max_pages:
+            path = f"/repos/{self.repository}/issues?state={state}&per_page={per_page}&page={page}"
+            if labels:
+                path += f"&labels={labels}"
+            data, _ = self.request("GET", path)
+            if not data:
+                break
+            results.extend(data)
+            if len(data) < per_page:
+                break
+            page += 1
+        # The issues endpoint also returns pull requests; filter those out.
+        return [i for i in results if "pull_request" not in i]
+
+    def list_open_issues(self):
+        return self.list_issues(state="open")
+
+    def get_issue(self, number):
+        data, _ = self.request("GET", f"/repos/{self.repository}/issues/{number}")
+        return data
+
+    def update_issue(self, number, payload):
+        data, _ = self.request("PATCH", f"/repos/{self.repository}/issues/{number}", payload)
+        return data
+
+    def close_issue(self, number):
+        return self.update_issue(number, {"state": "closed"})
+
+    def set_labels(self, number, labels):
+        data, _ = self.request(
+            "PUT", f"/repos/{self.repository}/issues/{number}/labels", {"labels": labels}
+        )
+        return data
+
+    def add_labels(self, number, labels):
+        data, _ = self.request(
+            "POST", f"/repos/{self.repository}/issues/{number}/labels", {"labels": labels}
+        )
+        return data
+
+    def add_comment(self, number, body):
+        data, _ = self.request(
+            "POST", f"/repos/{self.repository}/issues/{number}/comments", {"body": body}
+        )
+        return data
+
+    def list_comments(self, number):
+        data, _ = self.request("GET", f"/repos/{self.repository}/issues/{number}/comments?per_page=100")
+        return data

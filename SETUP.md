@@ -1,74 +1,45 @@
-# 설치 가이드
+# 설치 가이드 (v2)
 
-터미널에서 진행하는 부분과 GitHub 웹/앱에서 클릭으로 진행하는 부분이 섞여 있어요. 순서대로 따라오시면 됩니다.
+기존에 이미 저장소를 만들고 GitHub Pages, Actions 권한까지 설정해두셨다면, 이 v2 업데이트는 **코드만 새로 반영하면 끝**이에요. 아래는 혹시 처음부터 다시 설정해야 할 경우를 위한 전체 가이드입니다.
 
-## 1. GitHub에 새 저장소 만들기
+## 1. 저장소 준비
 
-1. github.com 로그인 → 우측 상단 `+` → **New repository**
-2. Repository name: 예) `daily-task-tracker`
-3. Public/Private 아무거나 (Private이어도 Actions는 무료)
-4. README/.gitignore/license는 **추가하지 않고** 빈 저장소로 생성
-5. 생성 후 나오는 저장소 주소 복사 (예: `https://github.com/내아이디/daily-task-tracker.git`)
+이미 있는 `daily-task-tracker` 저장소를 그대로 씁니다. 새로 만들 필요 없어요.
 
-## 2. 로컬 파일을 저장소에 올리기
-
-받은 zip 압축을 풀고 그 폴더로 이동해서 아래 명령을 순서대로 실행합니다.
-
-```bash
-cd daily-task-tracker
-
-git init
-git add .
-git commit -m "chore: 할일 관리 프로젝트 초기 설정"
-git branch -M main
-git remote add origin https://github.com/내아이디/daily-task-tracker.git
-git push -u origin main
-```
-
-`내아이디`는 본인 GitHub 아이디로 바꿔주세요.
-
-## 3. Actions 권한 켜기 (★ 가장 중요, 안 하면 전부 실패)
+## 2. Actions 권한 확인 (한 번 해두셨다면 그대로 유지)
 
 1. 저장소 → **Settings** → 좌측 **Actions** → **General**
-2. 하단 **Workflow permissions**에서 **"Read and write permissions"** 선택
-3. **Save**
+2. **Workflow permissions**에서 **"Read and write permissions"** 선택 → **Save**
 
-## 4. 워크플로 첫 실행해보기
+## 3. 새 워크플로 3개 확인
 
-1. 저장소 → **Actions** 탭
-2. `Morning - Create Tasks & Digest` 선택 → **Run workflow** 로 수동 실행
-   - 성공하면 Issues 탭에 오늘의 반복 이슈 + "📋 오늘의 할 일" 이슈가 생깁니다.
-3. `Evening - Nudge & Update Stats` 도 한 번 수동 실행
-   - 성공하면 README.md 통계가 갱신된 커밋이 자동으로 생깁니다.
+이번 업데이트로 워크플로가 이렇게 바뀌었어요.
 
-## 5. GitHub Projects 보드 만들기 (우선순위/진행상황 한눈에 보기)
+- `morning.yml` — 매일 06:00 KST, 반복 할일 생성 + 오늘의 할일 이슈 생성 (기존과 동일한 시간)
+- `push_notify.yml` — **신규**. 매일 오후 4:30, 오후 9:30 KST에 셀프 멘션 댓글로 푸시 트리거
+- `evening.yml` — 매일 23:50 KST, 완료 통계 갱신 (기존 "넛지" 기능은 제거됨 — 우선순위가 없어져서 더 이상 필요 없어요)
 
-1. 저장소 → **Projects** 탭 → **New project** → **Board** 템플릿 선택
-2. 기본 컬럼(Todo / In Progress / Done)을 그대로 쓰거나 원하는 대로 수정
-3. 우측 상단 **⋯ (메뉴)** → **Workflows** 클릭 → 아래 두 가지를 켜기
-   - **"Item added to project"** 대신, **저장소 Issues와 자동 연동**하려면 프로젝트 화면에서 **+ Add item** → **Add from repository**로 이 저장소를 연결한 뒤, Workflows에서 **"Auto-add to project"** 를 켜고 조건을 "이슈가 열릴 때"로 설정하세요. 그러면 새로 생기는 이슈가 자동으로 보드에 올라옵니다.
-   - **"Item closed"** → **Status: Done**으로 설정해두면, 이슈를 Close하는 순간 보드에서도 자동으로 Done 칸으로 이동합니다.
-4. 보드 화면에서 **Group by** 를 **Labels**로 바꾸면 P1/P2/P3별로 묶여서 보여서, 우선순위 파악이 훨씬 쉬워집니다.
+저장소 → **Actions** 탭에서 세 워크플로가 다 보이는지 확인하고, 한 번씩 **Run workflow**로 수동 실행해서 에러 없이 도는지 확인해보세요.
 
-(이 단계는 GitHub 화면에서 클릭 몇 번으로 끝나고, 코드 수정은 필요 없어요.)
+## 4. 휴대폰 푸시 알림 켜기 (필수 — 기존과 다른 토글)
 
-## 6. 휴대폰 푸시 알림 켜기 (이메일 없이 알림 받기)
+**GitHub 앱 → Profile → Settings → Notifications**에서 이번엔 **"Direct mentions"**를 켜주세요. (기존에 켜두셨던 "Assignments" 토글은 꺼도 되고 켜둬도 상관없어요 — 어차피 이제 멘션 방식만 씁니다.)
 
-**iOS**: GitHub 앱 → Profile → Settings → Notifications → **"Assignments to issues or pull requests"** 켜기
-**Android**: GitHub 앱 → Profile → Settings → Configure Notifications → 동일 항목 켜기
+## 5. 반복 할일 등록/수정하기
 
-이 토글만 켜두면, 매일 아침 자동 생성된 이슈가 나에게 할당될 때마다 이메일 없이 휴대폰 푸시로만 알림이 옵니다.
+이제 `tasks.yml`을 손으로 고칠 필요 없이, **웹페이지(index.html)의 "+ 반복 할일 등록" 폼**에서 바로 등록할 수 있어요. 요일과 (원하면) 기간까지 지정하면 `data/recurring_rules.json`에 자동으로 저장되고, 다음 날 아침부터 반영됩니다.
 
-## 7. 실제로 사용하기
+## 6. 즐겨찾기 쓰기
 
-- 아침: 휴대폰 푸시 알림 확인, 또는 GitHub 앱에서 "📋 오늘의 할 일" 이슈 열어보기
-- 완료할 때마다: 해당 이슈 Close (Projects 보드에도 자동 반영됨)
-- 급한 일이 생기면: 이슈에 `P1` 라벨 추가
-- 새로운 반복 작업을 추가하고 싶으면: `tasks.yml` 수정 후 push
+할일 입력창 옆 **"즐겨찾기 ▾"** 버튼을 누르면 저장된 문구 목록이 뜨고, 탭하면 바로 그 날짜에 추가돼요. 목록 아래 입력창으로 새 즐겨찾기를 추가하거나 ✕로 지울 수 있어요.
+
+## 7. Period 할일 등록하기
+
+**"+ Period 할일 등록"** 폼에서 제목 + 시작일 + 종료일을 넣고 등록하면, 평소엔 목록에 안 보이다가 **종료일 당일**에만 오늘의 할일 목록에 나타나요. 캘린더에는 등록하자마자 그 기간에 걸친 막대로 바로 보여요.
 
 ## 문제 해결
 
-- **이슈/댓글/커밋이 하나도 안 만들어져요** → 3단계(Workflow permissions)를 다시 확인하세요. 저장소가 아니라 **조직(Organization) 설정**에서 막혀 있을 수도 있어요.
-- **Projects 보드에 이슈가 자동으로 안 올라와요** → 5단계의 "Auto-add to project" workflow가 켜져 있는지, 조건이 올바른지 확인하세요.
-- **푸시 알림이 안 와요** → 6단계 토글 확인 + GitHub 앱 자체의 시스템 알림 권한(휴대폰 설정)도 켜져 있는지 확인하세요.
-- **시간대를 바꾸고 싶어요** → `.github/workflows/*.yml`의 `cron` 값을 수정하세요. GitHub Actions의 cron은 항상 UTC 기준입니다.
+- **푸시가 안 와요** → "Direct mentions" 토글이 켜져 있는지, 저장소 Actions가 세 워크플로 모두 정상 실행됐는지 확인하세요.
+- **캘린더에 점/막대가 하나도 안 보여요** → 홈 화면 상단의 "새로고침" 버튼을 눌러보세요. 이슈를 최대 600개까지 한 번에 불러오는 구조라, 그 이상 쌓이면 오래된 것부터 캘린더에 안 잡힐 수 있어요 (나중에 페이지네이션 개선이 필요할 수 있는 부분).
+- **반복 할일을 등록했는데 오늘 목록에 안 보여요** → 정상이에요. 반복 할일은 "내일 아침 자동 생성" 시점부터 반영돼서, 등록한 당일에는 소급 적용되지 않아요.
+- **시간대를 바꾸고 싶어요** → `.github/workflows/*.yml`의 `cron` 값을 수정하세요. GitHub Actions의 cron은 항상 UTC 기준입니다 (KST = UTC+9).

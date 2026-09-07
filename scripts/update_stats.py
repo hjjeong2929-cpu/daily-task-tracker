@@ -1,38 +1,60 @@
-#!/usr/bin/env python3
-"""오늘 마감(due) 이슈들의 완료 여부를 집계해 data/history.json과 README 통계를 갱신한다.
+"""Tally today's completion rate and refresh the README stats block + streak.
 
-- 반복 이슈든 수동으로 만든 이슈든, 제목에 "(오늘 날짜)"가 붙어있으면 대상이 된다.
-- 다이제스트 요약 이슈 자체는 집계에서 제외한다.
+Runs once a day (23:50 KST). Counts every issue tagged with today's date
+(via the "(YYYY-MM-DD)" title suffix), excluding the digest issue itself
+and anything labeled "skipped" (those were marked "해당 없음", not a real
+miss, so they shouldn't hurt the streak).
 """
 import json
 import os
+import re
 
-from ghutil import GitHub, DIGEST_LABEL, now_kst, today_kst
+from ghutil import GitHub, DIGEST_LABEL, SKIPPED_LABEL, extract_due_date, today_kst
 
 HISTORY_PATH = "data/history.json"
 README_PATH = "README.md"
-START_MARK = "<!-- STATS:START -->"
-END_MARK = "<!-- STATS:END -->"
-RECENT_DAYS_SHOWN = 14
-
-
-def fetch_due_today_issues(gh, today_str):
-    query = f'repo:{gh.repo} is:issue in:title "({today_str})"'
-    return gh.search_issues(query)
+STATS_START = "<!-- STATS:START -->"
+STATS_END = "<!-- STATS:END -->"
 
 
 def load_history():
-    if os.path.exists(HISTORY_PATH):
-        with open(HISTORY_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    if not os.path.exists(HISTORY_PATH):
+        return []
+    with open(HISTORY_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def save_history(history):
     os.makedirs(os.path.dirname(HISTORY_PATH), exist_ok=True)
     with open(HISTORY_PATH, "w", encoding="utf-8") as f:
         json.dump(history, f, ensure_ascii=False, indent=2)
-        f.write("\n")
+
+
+def tally_today(gh, today):
+    total = 0
+    completed = 0
+    for issue in gh.list_issues(state="all"):
+        labels = {l["name"] for l in issue.get("labels", [])}
+        if DIGEST_LABEL in labels or SKIPPED_LABEL in labels:
+            continue
+        due = extract_due_date(issue["title"])
+        if due != today:
+            continue
+        total += 1
+        if issue["state"] == "closed":
+            completed += 1
+    return total, completed
+
+
+def upsert_today(history, today_str, total, completed):
+    for entry in history:
+        if entry["date"] == today_str:
+            entry["total"] = total
+            entry["completed"] = completed
+            return history
+    history.append({"date": today_str, "total": total, "completed": completed})
+    history.sort(key=lambda e: e["date"])
+    return history
 
 
 def compute_streak(history):
@@ -45,73 +67,58 @@ def compute_streak(history):
     return streak
 
 
-def render_stats(history):
-    recent = history[-RECENT_DAYS_SHOWN:]
-    strip = []
-    for e in recent:
-        if e["total"] == 0:
-            strip.append("⬜")
-        elif e["completed"] == e["total"]:
-            strip.append("🟩")
-        elif e["completed"] > 0:
-            strip.append("🟨")
-        else:
-            strip.append("🟥")
-
-    streak = compute_streak(history)
-    scored_days = [e for e in history if e["total"] > 0]
-    avg_rate = (
-        sum(e["completed"] / e["total"] for e in scored_days) / len(scored_days) if scored_days else 0
+def render_stats_block(history, streak):
+    recent = history[-14:]
+    strip = "".join(
+        "🟩" if e["total"] > 0 and e["completed"] == e["total"]
+        else ("🟨" if e["completed"] > 0 else "⬜")
+        for e in recent
     )
-
-    return "\n".join(
-        [
-            START_MARK,
-            "",
-            f"**🔥 연속 완주 스트릭:** {streak}일",
-            "",
-            f"**최근 {len(recent)}일:** {' '.join(strip) if strip else '(기록 없음)'}",
-            "",
-            f"**전체 평균 달성률:** {avg_rate * 100:.0f}% ({len(scored_days)}일 기록)",
-            "",
-            f"_마지막 업데이트: {now_kst().strftime('%Y-%m-%d %H:%M')} KST_",
-            "",
-            END_MARK,
-        ]
-    )
+    if recent:
+        avg = sum(e["completed"] for e in recent) / max(sum(e["total"] for e in recent), 1) * 100
+    else:
+        avg = 0
+    lines = [
+        STATS_START,
+        "",
+        f"**연속 완료 스트릭:** {streak}일 🔥",
+        "",
+        f"**최근 {len(recent)}일:** {strip}",
+        "",
+        f"**최근 {len(recent)}일 평균 완료율:** {avg:.0f}%",
+        "",
+        STATS_END,
+    ]
+    return "\n".join(lines)
 
 
 def update_readme(stats_block):
     with open(README_PATH, "r", encoding="utf-8") as f:
         content = f.read()
-    if START_MARK in content and END_MARK in content:
-        content = content.split(START_MARK)[0] + stats_block + content.split(END_MARK)[1]
+    pattern = re.compile(re.escape(STATS_START) + r".*?" + re.escape(STATS_END), re.DOTALL)
+    if pattern.search(content):
+        content = pattern.sub(stats_block, content)
     else:
-        content = content.rstrip() + "\n\n" + stats_block + "\n"
+        content += f"\n\n{stats_block}\n"
     with open(README_PATH, "w", encoding="utf-8") as f:
         f.write(content)
 
 
 def main():
     gh = GitHub()
-    today_str = today_kst().isoformat()
+    today = today_kst()
+    today_str = today.isoformat()
 
-    issues = [
-        i for i in fetch_due_today_issues(gh, today_str)
-        if DIGEST_LABEL not in {l["name"] for l in i.get("labels", [])}
-    ]
-    total = len(issues)
-    completed = sum(1 for i in issues if i["state"] == "closed")
-
+    total, completed = tally_today(gh, today)
     history = load_history()
-    if history and history[-1]["date"] == today_str:
-        history[-1] = {"date": today_str, "total": total, "completed": completed}
-    else:
-        history.append({"date": today_str, "total": total, "completed": completed})
+    history = upsert_today(history, today_str, total, completed)
     save_history(history)
 
-    update_readme(render_stats(history))
-    print(f"{today_str}: {completed}/{total} 완료 (누적 {len(history)}일)")
+    streak = compute_streak(history)
+    stats_block = render_stats_block(history, streak)
+    update_readme(stats_block)
+
+    print(f"{today_str}: {completed}/{total} completed, streak={streak}")
 
 
 if __name__ == "__main__":

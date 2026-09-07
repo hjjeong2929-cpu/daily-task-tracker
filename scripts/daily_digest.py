@@ -1,64 +1,68 @@
-#!/usr/bin/env python3
-"""오늘 챙겨야 할 일(연체 · 오늘 마감 · P1)을 모아 '오늘의 할 일' 이슈로 정리한다.
+"""Create (or refresh) today's anchor issue: "📋 오늘의 할일 (YYYY-MM-DD)".
 
-반복 이슈 생성 다음 단계로 실행되는 것을 전제로 한다.
+This issue is assigned to the owner and later gets two comments during the
+day (see notify_push.py) that self-mention the owner to trigger a GitHub
+Mobile push at fixed times. It is not a to-do item itself, so it always
+carries the "digest" label and is excluded from every other list/stat.
+
+Note: tasks never roll over to the next day (that was decided on purpose),
+so this only looks at tasks whose title date is exactly today -- never
+anything from a previous day.
 """
-from ghutil import GitHub, DIGEST_LABEL, DIGEST_LABEL_COLOR, extract_due_date, today_kst
+from ghutil import (
+    GitHub,
+    DIGEST_LABEL,
+    SKIPPED_LABEL,
+    extract_due_date,
+    today_kst,
+)
 
-DIGEST_TITLE_PREFIX = "📋 오늘의 할 일"
+
+def collect_today_tasks(gh, today):
+    """Every open, non-digest, non-skipped issue due exactly today."""
+    tasks = []
+    for issue in gh.list_open_issues():
+        labels = {l["name"] for l in issue.get("labels", [])}
+        if DIGEST_LABEL in labels or SKIPPED_LABEL in labels:
+            continue
+        due = extract_due_date(issue["title"])
+        if due == today:
+            tasks.append({"issue": issue, "due": due})
+    tasks.sort(key=lambda t: t["issue"]["number"])
+    return tasks
 
 
-def classify(issue, today):
-    due = extract_due_date(issue["title"])
-    labels = {l["name"] for l in issue.get("labels", [])}
-    is_p1 = "P1" in labels
-    overdue = due is not None and due < today
-    due_today = due is not None and due == today
-    return due, is_p1, overdue, due_today
+def render_body(tasks, today):
+    if not tasks:
+        return f"오늘({today.isoformat()}) 기준으로 남은 할일이 없어요. 여유로운 하루네요."
+    lines = [f"오늘({today.isoformat()}) 기준 할일 {len(tasks)}개", ""]
+    for t in tasks:
+        issue = t["issue"]
+        lines.append(f"- [ ] {issue['title']} (#{issue['number']})")
+    return "\n".join(lines)
 
 
 def main():
     gh = GitHub()
     today = today_kst()
     today_str = today.isoformat()
+    title = f"📋 오늘의 할일 ({today_str})"
 
-    gh.ensure_label(DIGEST_LABEL, DIGEST_LABEL_COLOR)
+    gh.ensure_label(DIGEST_LABEL, "5319e7", "매일 아침 자동 생성되는 오늘의 할일 안내 이슈")
 
-    digest_title = f"{DIGEST_TITLE_PREFIX} ({today_str})"
-    if gh.issue_exists_with_title(digest_title):
-        print("오늘 요약 이슈가 이미 있어서 건너뜀")
+    if gh.issue_exists_with_title(title, state="all"):
+        print(f"digest issue already exists for {today_str}, skipping creation")
         return
 
-    open_issues = gh.list_open_issues()
-    picked = []
-    for issue in open_issues:
-        if issue["title"].startswith(DIGEST_TITLE_PREFIX):
-            continue
-        due, is_p1, overdue, due_today = classify(issue, today)
-        if overdue or due_today or is_p1:
-            # 정렬 키: 연체 먼저, 그다음 마감일이 이른 순, 그다음 P1 우선
-            sort_due = due or today
-            picked.append((0 if overdue else 1, sort_due, 0 if is_p1 else 1, overdue, issue))
-
-    picked.sort(key=lambda x: (x[0], x[1], x[2]))
-
-    if not picked:
-        body = "오늘은 연체되거나 급한 할 일이 없어요. 🎉"
-    else:
-        lines = []
-        for _, due, _, overdue, issue in picked:
-            if overdue:
-                tag = f"🔴 연체({due.isoformat()})"
-            elif due == today:
-                tag = "🟡 오늘 마감"
-            else:
-                tag = "🔵 P1"
-            lines.append(f"- [ ] {tag} [#{issue['number']}]({issue['html_url']}) {issue['title']}")
-        body = "\n".join(lines)
-        body += "\n\n_체크박스는 표시용입니다. 실제 완료 처리는 각 이슈를 Close 해주세요._"
-
-    issue = gh.create_issue(digest_title, body, labels=[DIGEST_LABEL], assignee=gh.owner_login)
-    print(f"오늘의 할 일 요약 생성: {len(picked)}건 -> {issue['html_url']}")
+    tasks = collect_today_tasks(gh, today)
+    body = render_body(tasks, today)
+    issue = gh.create_issue(
+        title=title,
+        body=body,
+        labels=[DIGEST_LABEL],
+        assignees=[gh.owner_login],
+    )
+    print(f"created digest issue #{issue['number']} with {len(tasks)} task(s)")
 
 
 if __name__ == "__main__":
