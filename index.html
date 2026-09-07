@@ -319,7 +319,7 @@
 
   function issuesForDate(dateStr) {
     return allIssues
-      .filter((i) => !i.isDigest && i.due === dateStr)
+      .filter((i) => !i.isDigest && !i.isSkipped && i.due === dateStr)
       .sort((a, b) => (a.state === b.state ? a.number - b.number : a.state === "open" ? -1 : 1));
   }
 
