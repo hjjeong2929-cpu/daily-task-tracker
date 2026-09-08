@@ -195,8 +195,13 @@
     <button id="periodAddBtn" class="submit-btn">Period 할일 등록</button>
   </details>
 
-  <details class="section-toggle" style="margin-top:8px;">
+  <details class="section-toggle" id="recDetails" style="margin-top:8px;">
     <summary>+ 반복 할일 등록 (요일 + 기간 지정)</summary>
+    <div style="margin:10px 0;">
+      <div style="font-size:13px;color:#6b7280;margin-bottom:4px;">현재 등록된 반복 할일</div>
+      <div id="recRulesList"></div>
+      <div id="recRulesEmpty" hidden style="color:#6b7280;font-size:13px;padding:8px 4px;">등록된 반복 할일이 없어요.</div>
+    </div>
     <div class="form-row">
       <label>제목</label>
       <input id="recTitle" type="text" placeholder="예: 스트레칭" />
@@ -391,7 +396,7 @@
     const monthStart = ymd(calYear, calMonth, 1);
     const monthEnd = ymd(calYear, calMonth, totalDays);
     allIssues
-      .filter((i) => i.isPeriod && i.periodStart && i.due)
+      .filter((i) => i.isPeriod && !i.isSkipped && i.periodStart && i.due)
       .filter((i) => i.periodStart <= monthEnd && i.due >= monthStart)
       .forEach((i) => {
         const startD = i.periodStart < monthStart ? 1 : Number(i.periodStart.split("-")[2]);
@@ -446,11 +451,11 @@
       }
       card.appendChild(titleEl);
 
-      if (issue.isRecurring && issue.state === "open") {
+      if (issue.state === "open" && !issue.isDigest) {
         const skipBtn = document.createElement("button");
         skipBtn.className = "skip-btn";
         skipBtn.textContent = "✕";
-        skipBtn.title = "오늘은 해당 없음 (삭제)";
+        skipBtn.title = issue.isRecurring ? "오늘은 해당 없음 (삭제)" : "삭제";
         skipBtn.addEventListener("click", (e) => {
           e.stopPropagation();
           skipInstance(issue);
@@ -563,6 +568,33 @@
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(rules, null, 2) + "\n")));
     const payload = { message, content, sha };
     await ghFetch(`/contents/data/recurring_rules.json`, { method: "PUT", body: JSON.stringify(payload) });
+  }
+  async function renderRecurringRulesList() {
+    const listEl = document.getElementById("recRulesList");
+    const emptyEl = document.getElementById("recRulesEmpty");
+    const { sha, rules } = await loadRecurringRules();
+    listEl.innerHTML = "";
+    emptyEl.hidden = rules.length > 0;
+    rules.forEach((rule) => {
+      const row = document.createElement("div");
+      row.className = "fav-item";
+      const span = document.createElement("span");
+      const daysLabel = rule.days.map((k) => DAY_LABELS[DAY_KEYS.indexOf(k)]).join("·");
+      const rangeLabel = rule.start_date && rule.end_date ? ` (${rule.start_date} ~ ${rule.end_date})` : "";
+      span.textContent = `${rule.title} - ${daysLabel}${rangeLabel}`;
+      row.appendChild(span);
+      const rm = document.createElement("button");
+      rm.className = "fav-remove";
+      rm.textContent = "✕";
+      rm.title = "삭제";
+      rm.addEventListener("click", async () => {
+        const updated = rules.filter((r) => r.id !== rule.id);
+        await saveRecurringRules(updated, sha, `chore: 반복 할일 삭제 - ${rule.title}`);
+        renderRecurringRulesList();
+      });
+      row.appendChild(rm);
+      listEl.appendChild(row);
+    });
   }
 
   // ---------- stats (data/history.json, read-only raw fetch) ----------
@@ -702,6 +734,10 @@
     document.getElementById("recRangeInputs").hidden = !e.target.checked;
   });
 
+  document.getElementById("recDetails").addEventListener("toggle", (e) => {
+    if (e.target.open) renderRecurringRulesList();
+  });
+
   document.getElementById("recAddBtn").addEventListener("click", async () => {
     const title = document.getElementById("recTitle").value.trim();
     if (!title) { alert("제목을 입력해주세요."); return; }
@@ -724,6 +760,7 @@
     document.getElementById("recHasRange").checked = false;
     document.getElementById("recRangeInputs").hidden = true;
     alert("등록됐어요! 내일 아침부터 자동으로 생성됩니다.");
+    renderRecurringRulesList();
   });
 
   if (token) init();
