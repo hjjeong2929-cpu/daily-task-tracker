@@ -11,12 +11,5 @@
       "sat",
       "sun"
     ]
-  },
-  {
-    "id": "weekly-retro",
-    "title": "주간 회고 쓰기",
-    "days": [
-      "sun"
-    ]
   }
 ]
